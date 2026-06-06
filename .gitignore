@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.env
+.env.local
+.DS_Store
+*.log
+.idea/
+.vscode/
+
+# Local debug/probe scripts
+probe.js
+probe2.cjs
+test-config.cjs
+schema.json
