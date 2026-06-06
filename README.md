@@ -27,7 +27,8 @@ You are responsible for your own actions, accounts, keys, usage, billing, compli
 - Uses provider IDs like `nano-gpt-personal` or `nano-gpt-backup`.
 - Pulls each provider's API key either from a direct `apiKey` field or from an environment variable via `apiKeyEnv`.
 - Fetches the live NanoGPT model catalog from `/models` for each profile at startup.
-- Falls back to a small static model catalog if model discovery fails.
+- Registers the shared union of all discovered/static model catalogs under every alias, so one key's filtered `/models` response does not make that alias's picker list smaller.
+- Falls back to a small static model catalog if model discovery fails for a profile.
 - Leaves account selection explicit: pick `nano-gpt-account-a/model` or `nano-gpt-account-b/model` in OpenCode.
 
 ## What It Does Not Do
@@ -226,13 +227,15 @@ const profiles = [
 
 ## Static Model Overrides
 
-By default, the plugin fetches the model catalog from NanoGPT at startup:
+By default, the plugin fetches the model catalog from NanoGPT at startup for each profile:
 
 ```text
 GET https://nano-gpt.com/api/v1/models
 ```
 
-If you want faster startup, deterministic model lists, or a reduced picker, provide a `models` map:
+The plugin merges every profile's discovered/static catalog into one shared union and registers that same union under every alias. This keeps the model selector consistent when NanoGPT returns a smaller `/models` response for one key than another.
+
+If you want faster startup, deterministic model lists, or to seed additional models into the shared union, provide a `models` map:
 
 ```js
 const profiles = [
@@ -250,6 +253,8 @@ const profiles = [
 ```
 
 The map keys are the model IDs as NanoGPT expects them. Values are OpenCode provider model metadata. `{ name: "..." }` is enough for basic usage.
+
+Model visibility does not guarantee that every account is authorized or funded to use every model. If NanoGPT rejects a request for a model under a specific key, that upstream response is returned by OpenCode.
 
 ## Migration From A Single NanoGPT Provider
 
@@ -344,9 +349,9 @@ Authorization: Bearer <profile key>
 x-api-key: <profile key>
 ```
 
-The request timeout is 3000 ms per profile. If NanoGPT is unreachable, slow, or returns an unexpected response, that profile still registers with the fallback catalog in `src/models.ts`.
+The request timeout is 3000 ms per profile. If NanoGPT is unreachable, slow, or returns an unexpected response, that profile contributes the fallback catalog in `src/models.ts`.
 
-The plugin does not persist fetched models. Model discovery runs again when OpenCode starts.
+After all profile catalogs are resolved, the plugin computes their union and assigns it to every configured provider alias. The plugin does not persist fetched models. Model discovery runs again when OpenCode starts.
 
 ## Security Notes
 
@@ -464,6 +469,11 @@ config.provider[profile.providerId] = {
 ```
 
 ## Changelog
+
+### 0.1.2 - 2026-06-06
+
+- Changed provider registration to use a shared union model catalog across all NanoGPT aliases.
+- Fixed cases where one account's filtered NanoGPT `/models` response caused that alias to show fewer models in OpenCode than another alias.
 
 ### 0.1.1 - 2026-06-06
 

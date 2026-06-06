@@ -4,6 +4,8 @@ import { cloneDefaultModels } from "./models.js"
 const MODEL_FETCH_TIMEOUT_MS = 3000
 const NANOGPT_NPM = "@ai-sdk/openai-compatible"
 
+type ModelMap = Record<string, Record<string, unknown>>
+
 async function timedFetch(
   url: string,
   init: RequestInit,
@@ -46,7 +48,22 @@ function modelName(id: string): string {
 
 export async function buildProviderConfig(
   profile: ResolvedProfile,
+  models: ModelMap,
 ): Promise<Record<string, unknown>> {
+  return {
+    npm: NANOGPT_NPM,
+    name: profile.name,
+    options: {
+      apiKey: profile.apiKey,
+      baseURL: profile.baseURL,
+    },
+    models,
+  }
+}
+
+async function resolveModels(
+  profile: ResolvedProfile,
+): Promise<ModelMap> {
   let models = profile.models
 
   if (!models) {
@@ -61,15 +78,7 @@ export async function buildProviderConfig(
     }
   }
 
-  return {
-    npm: NANOGPT_NPM,
-    name: profile.name,
-    options: {
-      apiKey: profile.apiKey,
-      baseURL: profile.baseURL,
-    },
-    models,
-  }
+  return models
 }
 
 export async function injectProfiles(
@@ -77,10 +86,22 @@ export async function injectProfiles(
   profiles: ResolvedProfile[],
 ): Promise<void> {
   const providers = getOrCreateRecord(config, "provider")
+  const resolvedModels = await Promise.all(profiles.map((profile) => resolveModels(profile)))
+  const sharedModels = mergeModels(resolvedModels)
 
   for (const profile of profiles) {
-    providers[profile.providerId] = await buildProviderConfig(profile)
+    providers[profile.providerId] = await buildProviderConfig(profile, sharedModels)
   }
+}
+
+function mergeModels(models: ModelMap[]): ModelMap {
+  const merged: ModelMap = {}
+  for (const catalog of models) {
+    for (const [id, model] of Object.entries(catalog)) {
+      merged[id] ??= model
+    }
+  }
+  return merged
 }
 
 async function fetchModels(

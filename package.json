@@ -1,6 +1,6 @@
 {
   "name": "opencode-nanogpt-provider-aliases",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "OpenCode plugin for multiple picker-visible NanoGPT provider aliases",
   "type": "module",
   "main": "./dist/index.js",
